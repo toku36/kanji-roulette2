@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>漢字ルーレット</title>
+<style>
+    /* 既存のstyleに追加 */
+/* スライダーの見た目はブラウザ依存なのでシンプルに */
+#font-size-range {
+  cursor: pointer;
+}
+  body {
+    font-family: "ヒラギノ角ゴ ProN","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background: #f0f4f8;
+    margin: 0; padding: 20px;
+    color: #222;
+  }
+  h1 {
+    display: inline-block;
+    margin-right: 20px;
+    font-weight: bold;
+    font-size: 24px;
+  }
+  select, button {
+    font-size: 16px;
+    padding: 6px 10px;
+    margin-right: 12px;
+  }
+  /* 丸いラジオボタンカスタム */
+  .radio-group {
+    margin-top: 12px;
+    user-select: none;
+  }
+  .radio-label {
+    position: relative;
+    display: inline-block;
+    margin-right: 22px;
+    cursor: pointer;
+    padding-left: 28px;
+    font-weight: 600;
+    font-size: 16px;
+    vertical-align: middle;
+  }
+  .radio-label input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0; width: 0;
+  }
+  .radiomark {
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    height: 18px;
+    width: 18px;
+    background-color: #eee;
+    border-radius: 50%;
+    border: 2px solid #888;
+    box-sizing: border-box;
+  }
+  .radio-label input[type="radio"]:checked ~ .radiomark {
+    background-color: #4a90e2;
+    border-color: #4a90e2;
+  }
+  .radiomark::after {
+    content: "";
+    position: absolute;
+    display: none;
+    left: 5px; top: 5px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+  .radio-label input[type="radio"]:checked ~ .radiomark::after {
+    display: block;
+  }
+
+  /* チェックボックスグループ */
+  #kanji-list {
+    margin-top: 24px;
+    background: white;
+    min-height: 180px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    padding: 12px 16px;
+    font-size: 20px;
+    color: #111;
+  }
+  #kanji-list.reading {
+    font-weight: 700;
+    font-size: 22px;
+    color: #006600;
+  }
+  .kanji-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .kanji-item:last-child {
+    border-bottom: none;
+  }
+
+  #pagination {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+  }
+  #pagination button {
+    font-size: 16px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    background: #fafafa;
+    transition: background-color 0.3s ease;
+  }
+  #pagination button:disabled {
+    cursor: default;
+    background: #eee;
+    color: #999;
+  }
+  #page-info {
+    font-weight: 600;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+
+<h1>漢字ルーレット</h1>
+
+<label for="grade-select">期間選択：</label>
+<select id="grade-select" aria-label="学年選択">
+  <option value="all">全範囲</option>
+  <option value="1">中１</option>
+  <option value="2">中２</option>
+  <option value="3" selected>中３</option>
+</select>
+
+<select id="term-select" aria-label="期間詳細選択">
+  <option value="">選択してください</option>
+  <option value="first_mid">前期中間</option>
+  <option value="first_end" selected>前期期末</option>
+  <option value="second_mid">後期中間</option>
+  <option value="second_end">後期期末</option>
+</select>
+
+<!-- フォントサイズ調整スライダーの追加（ページ上部のselect等の近く） -->
+<label for="font-size-range" style="display:block; margin-top:20px; font-weight:600;">
+  表示フォントサイズ：
+  <input
+    type="range"
+    id="font-size-range"
+    min="12"
+    max="40"
+    value="20"
+    step="1"
+    aria-valuemin="12"
+    aria-valuemax="40"
+    aria-valuenow="20"
+    aria-label="表示フォントサイズ調整"
+    style="vertical-align: middle; margin-left: 10px; width: 200px;"
+  />
+  <span id="font-size-value" style="margin-left:8px;">20px</span>
+</label>
+
+<section class="radio-group" aria-label="読みか漢字か選択">
+  <label class="radio-label" for="radio-reading">
+    <input type="radio" name="readkanji" id="radio-reading" value="reading" />
+    <span class="radiomark"></span> 読み
+  </label>
+  <label class="radio-label" for="radio-kanji">
+    <input type="radio" name="readkanji" id="radio-kanji" value="kanji" checked />
+    <span class="radiomark"></span> 漢字
+  </label>
+</section>
+
+<section class="radio-group" aria-label="出題形式の選択" style="margin-top: 20px;">
+  <label class="radio-label" for="radio-roulette">
+    <input type="radio" name="mode" id="radio-roulette" value="roulette" />
+    <span class="radiomark"></span> ルーレット
+  </label>
+  <label class="radio-label" for="radio-order">
+    <input type="radio" name="mode" id="radio-order" value="order" />
+    <span class="radiomark"></span> 順番
+  </label>
+
+  <span id="display-count-group" style="margin-left: 30px; user-select:none; color: #555;">
+    <label class="radio-label" for="display-one" style="color:inherit; cursor:pointer;">
+      <input type="radio" name="display-count" id="display-one" value="one" checked />
+      <span class="radiomark"></span> 1つ表示
+    </label>
+    <label class="radio-label" for="display-all" style="color:inherit; cursor:pointer; margin-left:16px;">
+      <input type="radio" name="display-count" id="display-all" value="all" />
+      <span class="radiomark"></span> 全表示
+    </label>
+  </span>
+
+  <button id="start-btn" style="display:none; margin-left: 20px;" aria-label="ルーレット開始">開始</button>
+</section>
+
+<label for="page-range" style="display:block; margin-top:20px;">範囲選択（プリント）:</label>
+<select id="page-range" aria-label="範囲選択（プリント）">
+  <option value="all">全範囲</option>
+  <option value="11" selected>プリント11</option>
+  <option value="12">プリント12</option>
+  <option value="13">プリント13</option>
+  <option value="14">プリント14</option>
+  <option value="15">プリント15</option>
+  <option value="16">プリント16</option>
+  <option value="17">プリント17</option>
+  <option value="18">プリント18</option>
+  <option value="19">プリント19</option>
+  <option value="20">プリント20</option>
+</select>
+
+<div id="kanji-list" aria-live="polite" aria-atomic="true">
+  「ルーレット」か「順番」を選んでください。
+</div>
+
+<div id="pagination" style="display:none;">
+  <button id="prev-page" aria-label="前のページ">前へ</button>
+  <span id="page-info" aria-live="polite" aria-atomic="true">11</span>
+  <button id="next-page" aria-label="次のページ">次へ</button>
+</div>
+
+<script>
+(() => {
+  const kanjiRaw = `
+中枢
+廃止
+歌舞伎
+消耗
+隷属
+克服
+侮辱
+凡庸
+逐次
+庶務
+清祥
+罷免
+
+重鎮
+漸次
+隆起
+叙情
+逮捕
+令嬢
+殊勝
+併設
+懐疑
+遺跡
+衷心
+自粛
+
+謄本
+曾祖父
+津波
+循環
+洪水
+酷評
+文豪
+犠牲
+貢献
+閉塞
+葛藤
+辛辣
+
+憂鬱
+憤慨
+甚だ
+羞恥心
+衣装
+天賦
+扶助
+寡黙
+適宜
+寮生
+主宰
+情緒
+
+山荘
+梗概
+橋桁
+桟橋
+貪欲
+贈賄
+満悦
+怨念
+慰労
+詐欺
+訃報
+詮索
+
+拘束
+掌中
+弾劾
+炭坑
+軒数
+象牙
+融通
+嫉妬
+畏敬
+賜る
+小唄
+窮地
+
+糾弾
+玩具
+翻弄
+藩主
+近畿
+帳尻
+褐色
+湖畔
+炎上
+亜流
+勾配
+高騰
+
+旋律
+詠嘆
+山麓
+苦杯
+惰性
+郷愁
+追悼
+恣意
+慄然
+悔恨
+水筒
+
+穂先
+焦点
+暫定
+征服
+錬成
+座禅
+蚊柱
+朱肉
+柿色
+瓦版
+石碑
+建坪
+邦楽
+塑像
+金塊
+堕落
+垣根
+一斗
+一升
+一斤
+一厘
+壱万円
+弐万円
+朕
+`.trim();
+
+  const readingRaw = `
+ちゅうすう
+はいし
+かぶき
+しょうもう
+れいぞく
+こくふく
+ぶじょく
+ぼんよう
+ちくじ
+しょむ
+せいしょう
+ひめん
+
+じゅうちん
+ぜんじ
+りゅうき
+じょじょう
+たいほ
+れいじょう
+しゅしょう
+へいせつ
+かいぎ
+いせき
+ちゅうしん
+じしゅく
+
+とうほん
+そうそふ
+つなみ
+じゅんかん
+こうずい
+こくひょう
+ぶんごう
+ぎせい
+こうけん
+へいそく
+かっとう
+しんらつ
+
+ゆううつ
+ふんがい
+はなはだ
+しゅうちしん
+いしょう
+てんぷ
+ふじょ
+かもく
+てきぎ
+りょうせい
+しゅさい
+じょうちょ
+
+さんそう
+こうがい
+はしげた
+さんばし
+どんよく
+ぞうわい
+まんえつ
+おんねん
+いろう
+さぎ
+ふほう
+せんさく
+
+こうそく
+しょうちゅう
+だんがい
+たんこう
+けんすう
+ぞうげ
+ゆうづう
+しっと
+いけい
+たまわる
+こうた
+きゅうち
+
+きゅうだん
+がんぐ
+ほんろう
+はんしゅ
+きんき
+ちょうじり
+かっしょく
+こはん
+えんじょう
+ありゅう
+こうばい
+こうとう
+
+せんりつ
+えいたん
+さんろく
+くはい
+だせい
+きょうしゅう
+ついとう
+しい
+りつぜん
+かいこん
+すいとう
+
+ほさき
+しょうてん
+ざんてい
+せいふく
+れんせい
+ざぜん
+かばしら
+しゅにく
+かきいろ
+がばん
+せきひ
+たてつぼ
+
+ほうがく
+そぞう
+きんかい
+だらく
+かきね
+いっと
+いっしょう
+いっきん
+いちりん
+いちまんえん
+にまんえん
+ちん
+`.trim();
+
+  const ITEMS_PER_PAGE = 12;
+  const PAGE_MIN = 11;
+  const PAGE_MAX = 20;
+
+  const gradeSelect = document.getElementById('grade-select');
+  const termSelect = document.getElementById('term-select');
+  const radioReading = document.getElementById('radio-reading');
+  const radioKanji = document.getElementById('radio-kanji');
+  const radioRoulette = document.getElementById('radio-roulette');
+  const radioOrder = document.getElementById('radio-order');
+  const startBtn = document.getElementById('start-btn');
+  const pageRangeSelect = document.getElementById('page-range');
+  const kanjiListDiv = document.getElementById('kanji-list');
+  const paginationDiv = document.getElementById('pagination');
+  const prevPageBtn = document.getElementById('prev-page');
+  const nextPageBtn = document.getElementById('next-page');
+  const pageInfoSpan = document.getElementById('page-info');
+  const displayCountGroup = document.getElementById('display-count-group');
+  const displayOneRadio = document.getElementById('display-one');
+  const displayAllRadio = document.getElementById('display-all');
+
+  const kanjiList = kanjiRaw.split(/\n+/);
+  const readingList = readingRaw.split(/\n+/);
+
+  let currentGrade = '3';
+  let currentTerm = 'first_end';
+  let currentReadOrKanji = 'kanji';
+  let currentMode = null;
+  let currentRange = '11';
+  let currentPage = 11;
+  let currentDisplayCount = 'one';
+
+      const fontSizeRange = document.getElementById('font-size-range');
+  const fontSizeValueSpan = document.getElementById('font-size-value');
+
+  // 初期フォントサイズ（20px）を変数で管理
+  let currentFontSize = 20;
+
+  // フォントサイズ変更関数
+  function updateFontSize(size) {
+    currentFontSize = size;
+    kanjiListDiv.style.fontSize = size + 'px';
+    fontSizeValueSpan.textContent = size + 'px';
+    fontSizeRange.setAttribute('aria-valuenow', size);
+  }
+
+  // スライダーイベント登録
+  fontSizeRange.addEventListener('input', e => {
+    const newSize = e.target.value;
+    updateFontSize(newSize);
+  });
+
+  // --- 既存のinit関数の最後にフォントサイズ設定を追加 ---
+  function init() {
+    currentGrade = '3';
+    currentTerm = 'first_end';
+    gradeSelect.value = currentGrade;
+    termSelect.value = currentTerm;
+    updateTermSelectEnable();
+
+    radioKanji.checked = true;
+    currentReadOrKanji = 'kanji';
+
+    currentMode = null;
+    currentDisplayCount = 'one';
+    displayOneRadio.checked = true;
+
+    currentRange = '11';
+    pageRangeSelect.value = currentRange;
+
+    startBtn.style.display = 'none';
+    updateDisplayCountState();
+
+    // フォントサイズ初期化
+    updateFontSize(currentFontSize);
+
+    kanjiListDiv.textContent = '「ルーレット」か「順番」を選んでください。';
+    paginationDiv.style.display = 'none';
+  }
+  init();
+    
+  function updateTermSelectEnable() {
+    if(currentGrade === 'all') {
+      termSelect.value = '';
+      termSelect.disabled = true;
+    } else {
+      termSelect.disabled = false;
+      if(!['1','2','3'].includes(currentGrade)) {
+        termSelect.value = '';
+      } else if(termSelect.value === '') {
+        termSelect.value = 'first_end';
+      }
+    }
+  }
+
+  function isActivePage() {
+    return currentGrade === '3' && currentTerm === 'first_end';
+  }
+
+  function getReadOrKanji() {
+    if(radioReading.checked) return 'reading';
+    if(radioKanji.checked) return 'kanji';
+    return null;
+  }
+
+  function getMode() {
+    if(radioRoulette.checked) return 'roulette';
+    if(radioOrder.checked) return 'order';
+    return null;
+  }
+
+  function getPageIndices(pageNum) {
+    const idxStart = (pageNum - PAGE_MIN) * ITEMS_PER_PAGE;
+    const idxEnd = idxStart + ITEMS_PER_PAGE;
+    return [idxStart, idxEnd];
+  }
+
+  function showOrderList() {
+    if(!isActivePage()) {
+      kanjiListDiv.textContent = '現在は中３前期期末ページです。他の期間を選択しても反応しません。';
+      paginationDiv.style.display = 'none';
+      return;
+    }
+    const roK = currentReadOrKanji;
+    if(!roK) {
+      kanjiListDiv.textContent = '「読み」か「漢字」を必ず選択してください。';
+      paginationDiv.style.display = 'none';
+      return;
+    }
+
+    let items = [];
+    if(currentRange === 'all') {
+      items = roK === 'kanji' ? kanjiList : readingList;
+      paginationDiv.style.display = 'none';
+    } else {
+      const pageNum = Number(currentRange);
+      if(pageNum < PAGE_MIN || pageNum > PAGE_MAX) {
+        kanjiListDiv.textContent = '範囲選択がおかしいです。';
+        paginationDiv.style.display = 'none';
+        return;
+      }
+      const [start, end] = getPageIndices(pageNum);
+      items = roK === 'kanji' ? kanjiList.slice(start, end) : readingList.slice(start, end);
+      paginationDiv.style.display = 'flex';
+      currentPage = pageNum;
+      updatePaginationButtons();
+    }
+
+    kanjiListDiv.classList.toggle('reading', roK === 'reading');
+
+    kanjiListDiv.innerHTML = '';
+    items.forEach(v => {
+      const d = document.createElement('div');
+      d.className = 'kanji-item';
+      d.textContent = v;
+      kanjiListDiv.appendChild(d);
+    });
+  }
+
+  function startRoulette() {
+    if(!isActivePage()) {
+      alert('現在は中３前期期末ページです。他の期間を選択しても反応しません。');
+      return;
+    }
+    if(!currentReadOrKanji) {
+      alert('「読み」か「漢字」を必ず選択してください。');
+      return;
+    }
+    let items;
+    if(currentRange === 'all') {
+      items = currentReadOrKanji === 'kanji' ? [...kanjiList] : [...readingList];
+    } else {
+      const pageNum = Number(currentRange);
+      if(pageNum < PAGE_MIN || pageNum > PAGE_MAX) {
+        alert('範囲選択がおかしいです。');
+        return;
+      }
+      const [start, end] = getPageIndices(pageNum);
+      items = currentReadOrKanji === 'kanji' ? kanjiList.slice(start, end) : readingList.slice(start, end);
+    }
+
+    kanjiListDiv.classList.toggle('reading', currentReadOrKanji === 'reading');
+    kanjiListDiv.innerHTML = '';
+
+    if(currentDisplayCount === 'one') {
+      // ランダムに1つだけ表示
+      const randomIndex = Math.floor(Math.random() * items.length);
+      const d = document.createElement('div');
+      d.className = 'kanji-item';
+      d.textContent = items[randomIndex];
+      kanjiListDiv.appendChild(d);
+    } else if(currentDisplayCount === 'all') {
+      // 全表示をランダム順で表示
+      const shuffled = shuffleArray(items);
+      shuffled.forEach(v => {
+        const d = document.createElement('div');
+        d.className = 'kanji-item';
+        d.textContent = v;
+        kanjiListDiv.appendChild(d);
+      });
+    }
+  }
+
+  function updatePaginationButtons() {
+    prevPageBtn.disabled = currentPage <= PAGE_MIN;
+    nextPageBtn.disabled = currentPage >= PAGE_MAX;
+    pageInfoSpan.textContent = currentPage;
+  }
+
+  function shuffleArray(array) {
+    const arr = [...array];
+    for(let i=arr.length-1; i>0; i--) {
+      const j = Math.floor(Math.random() * (i+1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // --- イベント登録 ---
+
+  gradeSelect.addEventListener('change', e => {
+    currentGrade = e.target.value;
+    updateTermSelectEnable();
+    // 他は何もしない（中３前期期末固定で制限）
+  });
+
+  termSelect.addEventListener('change', e => {
+    currentTerm = e.target.value;
+    updateTermSelectEnable();
+  });
+
+  document.querySelectorAll('input[name="readkanji"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+      currentReadOrKanji = e.target.value;
+      if(currentMode === 'order') {
+        showOrderList();
+      } else if(currentMode === 'roulette') {
+        kanjiListDiv.textContent = '「開始」ボタンを押すと表示が変わります。';
+      }
+    });
+  });
+
+  radioRoulette.addEventListener('change', e => {
+    currentMode = getMode();
+    startBtn.style.display = 'inline-block';
+    paginationDiv.style.display = 'none';
+    kanjiListDiv.textContent = '「開始」ボタンを押すと表示が変わります。';
+    updateDisplayCountState();
+  });
+
+  radioOrder.addEventListener('change', e => {
+    currentMode = getMode();
+    startBtn.style.display = 'none';
+    updateDisplayCountState();
+    showOrderList();
+  });
+
+  pageRangeSelect.addEventListener('change', e => {
+    currentRange = e.target.value;
+    if(currentMode === 'order') {
+      showOrderList();
+    } else if(currentMode === 'roulette') {
+      kanjiListDiv.textContent = '「開始」ボタンを押すと表示が変わります。';
+    }
+  });
+
+  startBtn.addEventListener('click', () => {
+    startRoulette();
+  });
+
+  prevPageBtn.addEventListener('click', () => {
+    if(currentPage > PAGE_MIN) {
+      currentPage--;
+      currentRange = String(currentPage);
+      pageRangeSelect.value = currentRange;
+      showOrderList();
+    }
+  });
+
+  nextPageBtn.addEventListener('click', () => {
+    if(currentPage < PAGE_MAX) {
+      currentPage++;
+      currentRange = String(currentPage);
+      pageRangeSelect.value = currentRange;
+      showOrderList();
+    }
+  });
+
+  document.querySelectorAll('input[name="display-count"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+      currentDisplayCount = e.target.value;
+      if(currentMode === 'roulette') {
+        kanjiListDiv.textContent = '「開始」ボタンを押すと表示が変わります。';
+      }
+    });
+  });
+
+  // display-count の有効化・無効化と色変え
+  function updateDisplayCountState() {
+    if(currentMode === 'roulette') {
+      displayCountGroup.style.color = '#555';
+      displayOneRadio.disabled = false;
+      displayAllRadio.disabled = false;
+    } else {
+      displayCountGroup.style.color = '#aaa';
+      displayOneRadio.disabled = true;
+      displayAllRadio.disabled = true;
+    }
+  }
+
+  // 初期化
+  function init() {
+    currentGrade = '3';
+    currentTerm = 'first_end';
+    gradeSelect.value = currentGrade;
+    termSelect.value = currentTerm;
+    updateTermSelectEnable();
+
+    radioKanji.checked = true;
+    currentReadOrKanji = 'kanji';
+
+    currentMode = null;
+    currentDisplayCount = 'one';
+    displayOneRadio.checked = true;
+
+    currentRange = '11';
+    pageRangeSelect.value = currentRange;
+
+    startBtn.style.display = 'none';
+    updateDisplayCountState();
+
+    kanjiListDiv.textContent = '「ルーレット」か「順番」を選んでください。';
+    paginationDiv.style.display = 'none';
+  }
+  init();
+
+    
+
+})();
+    
+</script>
+
+</body>
+</html>
